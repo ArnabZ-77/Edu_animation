@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animatrix AI - Math Animation Platform</title>
+    <!-- Google Fonts: Inter for text, Outfit for headings -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar for History -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-wand-magic-sparkles logo-icon"></i>
+                    <span>Animatrix</span>
+                </div>
+            </div>
+            
+            <div class="history-section">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> History</h3>
+                <ul id="historyList" class="history-list">
+                    <!-- History items will be injected here -->
+                    <li class="empty-history-text">No animations generated yet.</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Content -->
+        <main class="main-content">
+            <header class="main-header">
+                <h1>AI Educational Animation Platform</h1>
+                <p>Generate high-quality mathematical animations using natural language prompts.</p>
+            </header>
+
+            <div class="dashboard-grid">
+                <!-- Left Column: Inputs and Logs -->
+                <div class="left-col">
+                    <!-- Generation Request Card -->
+                    <div class="glass-card prompt-card">
+                        <h2>Create New Animation</h2>
+                        <p class="card-subtitle">Type your math or educational concept below to generate logic and compile it.</p>
+                        
+                        <div class="input-group">
+                            <textarea id="promptInput" placeholder="e.g., Animate a binary search algorithm looking for the value 70 in a sorted list of 9 elements..." rows="4"></textarea>
+                        </div>
+                        
+                        <button id="generateBtn" class="primary-btn">
+                            <i class="fa-solid fa-circle-play btn-icon"></i> Generate Animation
+                        </button>
+                    </div>
+
+                    <!-- Progress / Terminal Console Log Card -->
+                    <div id="statusCard" class="glass-card status-card hidden">
+                        <div class="status-header">
+                            <h2>Compilation Terminal</h2>
+                            <span id="statusBadge" class="status-badge processing">Processing</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="progressBar" class="progress-bar"></div>
+                        </div>
+                        <div class="terminal-logs" id="terminalLogs">
+                            <div class="log-line text-info"><i class="fa-solid fa-circle-info"></i> Ready to initialize API handshake...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Player and Code Inspector -->
+                <div class="right-col">
+                    <!-- Video Output Card -->
+                    <div class="glass-card player-card">
+                        <div class="player-header">
+                            <h2>Animation Preview</h2>
+                            <span id="sceneNameLabel" class="scene-label">No Active Scene</span>
+                        </div>
+                        
+                        <div class="video-container">
+                            <!-- Placeholder when no video -->
+                            <div id="videoPlaceholder" class="video-placeholder">
+                                <i class="fa-solid fa-video-slash placeholder-icon"></i>
+                                <p>Enter a prompt and hit Generate to view animation</p>
+                            </div>
+                            
+                            <!-- Custom Styled Video Tag -->
+                            <video id="videoPlayer" class="video-player hidden" controls autoplay loop>
+                                <source id="videoSource" src="" type="video/mp4">
+                                Your browser does not support HTML5 video elements.
+                            </video>
+                        </div>
+                    </div>
+
+                    <!-- Source Code Card -->
+                    <div class="glass-card code-card">
+                        <div class="code-header">
+                            <h2>Generated Python Code</h2>
+                            <button id="copyCodeBtn" class="icon-btn" title="Copy to Clipboard">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="code-container">
+                            <pre><code id="codeDisplay" class="language-python"># Generated Manim code will be shown here.</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

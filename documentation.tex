@@ -1,0 +1,454 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{booktabs}
+
+% Define elegant, modern color scheme
+\definecolor{primary}{HTML}{1E293B}   % Deep Slate (Navy/Charcoal)
+\definecolor{secondary}{HTML}{0F766E} % Rich Teal
+\definecolor{accent}{HTML}{B45309}    % Amber / Orange
+\definecolor{success}{HTML}{15803D}   % Forest Green
+\definecolor{background}{HTML}{F8FAFC} % Slate 50 (Very light gray-blue)
+\definecolor{codebg}{HTML}{F1F5F9}     % Slate 100
+
+% Configure Hyperref
+\hypersetup{
+    colorlinks=true,
+    linkcolor=secondary,
+    filecolor=secondary,      
+    urlcolor=secondary,
+    pdftitle={AI Animation Platform - Documentation},
+    pdfauthor={Antigravity AI Pair Programming},
+}
+
+% Configure custom tcolorboxes
+\newtcolorbox{setupbox}[2][]{
+    colback=background,
+    colframe=secondary,
+    fonttitle=\bfseries,
+    title={#2},
+    coltitle=white,
+    arc=2mm,
+    #1
+}
+
+\newtcolorbox{guardrailbox}[2][]{
+    colback=background,
+    colframe=accent,
+    fonttitle=\bfseries,
+    title={#2},
+    coltitle=white,
+    arc=2mm,
+    #1
+}
+
+\newtcolorbox{bugbox}[2][]{
+    colback=background,
+    colframe=primary,
+    fonttitle=\bfseries,
+    title={#2},
+    coltitle=white,
+    arc=2mm,
+    #1
+}
+
+% Configure Listings for source code display
+\lstset{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{gray},
+    keywordstyle=\color{secondary}\bfseries,
+    numberstyle=\tiny\color{gray},
+    stringstyle=\color{accent},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=4,
+    language=Python
+}
+
+\title{\Huge \textbf{AI Educational Animation Platform} \\ \Large Dynamic Manim Scene Generation \& Automation Pipeline}
+\author{\textbf{System Documentation \& Setup Guide}}
+\date{May 30, 2026}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction \& Project Goal}
+The \textbf{AI Educational Animation Platform} is a Python-based pipeline that automatically compiles high-quality mathematical and educational animations from human-readable text prompts. It connects the power of large language models (specifically \textbf{Gemini 2.5 Flash} using the modern \texttt{google-genai} SDK) to \textbf{Manim (Community Edition)}, a math animation engine.
+
+The core objective is to allow educators or developers to type a concept (such as \textit{"explain binary search visually"}) and obtain a compiled, ready-to-preview MP4 video file in seconds.
+
+---
+
+\section{System Environment \& Setup}
+To run this pipeline on Windows, we initialize a dedicated virtual environment to handle Python dependencies and the underlying LaTeX/FFmpeg tools required by Manim.
+
+\begin{setupbox}{Step 1: Create and Activate the Virtual Environment}
+First, open your PowerShell or Command Prompt in the project workspace folder and initialize the environment:
+\begin{lstlisting}[language=bash]
+# 1. Create a Python Virtual Environment
+python -m venv venv
+
+# 2. Activate the Virtual Environment (PowerShell)
+.\venv\Scripts\Activate.ps1
+
+# 3. Activate the Virtual Environment (Command Prompt)
+.\venv\Scripts\activate.bat
+\end{lstlisting}
+\end{setupbox}
+
+\begin{setupbox}{Step 2: Install Python Dependencies}
+Next, install the required packages. Ensure your virtual environment is active (indicated by a \texttt{(venv)} prefix in the terminal prompt):
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+\end{lstlisting}
+\end{setupbox}
+
+The file \texttt{requirements.txt} contains:
+\begin{lstlisting}[language=Python]
+google-genai
+python-dotenv
+manim
+\end{lstlisting}
+
+\begin{setupbox}{Step 3: Setup the Environment Variables}
+Create a \texttt{.env} file in the root workspace folder containing your API key:
+\begin{lstlisting}[language=bash]
+GEMINI_API_KEY=your_gemini_api_key_here
+\end{lstlisting}
+\end{setupbox}
+
+\begin{setupbox}{Step 4: Verify System Dependencies (Manim Core)}
+Manim relies on underlying system applications. If you do not have them installed, run:
+\begin{itemize}
+    \item \textbf{FFmpeg}: Required for video encoding. Install via \texttt{choco install ffmpeg} or scoop.
+    \item \textbf{LaTeX (Optional, for math formulas)}: MikTeX or TeX Live is recommended.
+\end{itemize}
+\end{setupbox}
+
+---
+
+\section{Project File Structure}
+The workspace is organized as follows:
+\begin{itemize}[label=\(\bullet\)]
+    \item \textbf{src/llm\_client.py}: Interface for the Gemini client, including retry logic and system instructions (guardrails).
+    \item \textbf{src/pipeline.py}: Coordinates prompt input, triggers LLM generation, extracts Python code, detects the Scene class name, and runs Manim as a subprocess.
+    \item \textbf{generated\_scene.py}: The script dynamically written by the pipeline during each run.
+    \item \textbf{media/}: Directory where compiled MP4 animations are saved by Manim.
+\end{itemize}
+
+---
+
+\section{The Core Automation Pipeline}
+
+\subsection{1. Code Generation (Gemini Bridge)}
+The client connects to the Gemini API using the \texttt{gemini-2.5-flash} model. It uses strict system instructions to enforce clean, executable output:
+
+\begin{lstlisting}[language=Python]
+# src/llm_client.py excerpt
+response = client.models.generate_content(
+    model='gemini-2.5-flash',
+    contents=user_instruction,
+    config=types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        temperature=0.1,  # Kept deterministic
+    )
+)
+\end{lstlisting}
+
+\subsection{2. Dynamic Scene Parsing}
+Once code is returned, \texttt{src/pipeline.py} uses regular expressions to find which class name was generated (e.g. \texttt{BinarySearch}) so Manim knows what class to target for rendering:
+\begin{lstlisting}[language=Python]
+# src/pipeline.py excerpt
+pattern = r"class\s+(\w+)\s*\(\s*\w*Scene\w*\s*\)\s*:"
+match = re.search(pattern, code)
+\end{lstlisting}
+
+\subsection{3. Subprocess Compilation}
+The pipeline invokes the Manim CLI tool to render the animation. It runs in low-quality mode (\texttt{-ql}) for speed and opens the preview file (\texttt{-p}) immediately upon completion:
+\begin{lstlisting}[language=Python]
+command = ["manim", "-pql", filepath, class_name]
+subprocess.run(command, check=True)
+\end{lstlisting}
+
+---
+
+\section{Debugging \& Optimization History}
+
+During testing of the \textbf{Binary Search} animation concept, three major visual and architectural bugs were found and resolved:
+
+\begin{bugbox}{Bug 1: Numpy Array ValueError in get\_pointer()}
+\textbf{Symptom:} The script crashed during compiling with: \\
+\texttt{ValueError: The truth value of an array with more than one element is ambiguous.} \\
+\textbf{Cause:} In Manim, direction indicators like \texttt{DOWN} are numpy arrays. The code generated had: \\
+\texttt{rotate(PI if direction == DOWN else 0)} \\
+Evaluating an equality condition directly on numpy arrays evaluates element-wise, triggering the ambiguity exception. \\
+\textbf{Resolution:} Replaced with \texttt{all(direction == DOWN)} or \texttt{np.array\_equal()}.
+\end{bugbox}
+
+\begin{bugbox}{Bug 2: Bottom Status and Result Text Collisions}
+\textbf{Symptom:} The final message \texttt{"Binary Search Complete!"} overlapped directly on top of the search comparison status texts (e.g. \texttt{"70 == 70! Target Found!"}). \\
+\textbf{Cause:} The generated code had both texts positioned at \texttt{next\_to(..., DOWN * 3)}, and the previous status text was never cleared/faded out. \\
+\textbf{Resolution:} Moved status texts to the screen edge using \texttt{.to\_edge(DOWN, buff=0.5)} and added an explicit \texttt{FadeOut(comparison\_text)} animation before rendering the final result.
+\end{bugbox}
+
+\begin{bugbox}{Bug 3: Horizontal Video Edge Overflow (Cutoff)}
+\textbf{Symptom:} The left and rightmost boxes of the sorted array (representing elements \texttt{10} and \texttt{90}) were cut off on the screen margins. \\
+\textbf{Cause:} The generated layout used boxes of width \texttt{1.0} with a huge buffer spacing of \texttt{0.8}. This resulted in a layout width of \texttt{15.4} units, exceeding Manim's screen width of \texttt{14.22} units. \\
+\textbf{Resolution:} Reduced cell width to \texttt{0.9} and the arrangement buffer to \texttt{0.15}, keeping the total width safely under \texttt{9.3} units.
+\end{bugbox}
+
+---
+
+\section{System Instructions \& Guardrails}
+To prevent the LLM from making similar layout mistakes in future runs, the system instructions inside \texttt{src/llm\_client.py} were upgraded with the following safety guardrails:
+
+\begin{guardrailbox}{Guardrail 7: Safe Numpy/Direction Vector Comparison}
+NEVER compare Manim direction vectors (like \texttt{UP}, \texttt{DOWN}, \texttt{LEFT}, \texttt{RIGHT}) directly using Python comparison operators (e.g., \texttt{direction == DOWN}). Use \texttt{all(direction == DOWN)} or \texttt{np.array\_equal(direction, DOWN)} to avoid ambiguous numpy evaluation.
+\end{guardrailbox}
+
+\begin{guardrailbox}{Guardrail 8: Text Collision Prevention}
+NEVER write new text/explanation Mobjects directly on top of existing ones. When updating on-screen explanation/status texts, use \texttt{Transform} or explicitly \texttt{FadeOut} the old text first. Place explanation/status text at the bottom edge using \texttt{.to\_edge(DOWN, buff=0.5)} to avoid spatial collisions with arrays and pointers.
+\end{guardrailbox}
+
+\begin{guardrailbox}{Guardrail 9: Screen Boundary Compliance}
+Keep horizontal element layouts within screen boundaries (maximum width of 14.2 units). Scale list elements appropriately and keep horizontal spacing buffers small (\texttt{buff=0.1} to \texttt{0.2}) to ensure nothing is clipped at the left/right screen edges.
+\end{guardrailbox}
+
+\newpage
+\section{Appendix: Full Project Source Code}
+
+Below is the complete, production-ready codebase for the AI Animation Platform.
+
+\subsection{requirements.txt}
+\begin{lstlisting}[language=bash]
+google-genai
+python-dotenv
+manim
+\end{lstlisting}
+
+\subsection{src/llm\_client.py}
+\begin{lstlisting}[language=Python]
+import os
+import re
+import time
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+# 1. Load the environment variables from the .env file
+load_dotenv()
+
+# 2. Extract and check the API key
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise ValueError(
+        "GEMINI_API_KEY is missing from your .env file! "
+        "Please ensure your .env file contains: GEMINI_API_KEY=your_key_here"
+    )
+
+# 3. Initialize the Google GenAI Client
+client = genai.Client(api_key=api_key)
+
+def generate_manim_code(user_instruction: str) -> str:
+    """
+    Sends a query to Gemini (gemini-2.5-flash) to write Python code
+    using the Manim library. Implements exponential backoff retries and strict guardrails.
+    """
+    system_instruction = (
+        "You are an expert mathematical animator using Python's Manim library (Community Edition).\n"
+        "Generate a complete, syntactically perfect Python script containing a Manim Scene class representing the animation requested.\n\n"
+        "STRICT COMPILATION GUARDRAILS:\n"
+        "1. NEVER initialize completely empty text objects like Text(\"\") or Tex(\"\") and then position them using .next_to() or .align_to(). "
+        "This triggers a fatal IndexError. Always use at least a space, like Text(\" \"), or a visible placeholder string.\n"
+        "2. NEVER use the non-existent '.to_center()' method on any object or VGroup. To center elements, use '.move_to(ORIGIN)' or '.center()'.\n"
+        "3. Do not hallucinate or guess methods. Stick to core, standard Manim methods like .shift(), .scale(), .rotate(), .next_to(), .align_to(), and .move_to().\n"
+        "4. Ensure all imported modules and custom classes (such as custom Mobjects) are fully defined within this single file.\n"
+        "5. Wrap your entire output strictly inside a single code block using standard markdown: ```python ... ```\n"
+        "6. Do not write any conversational intro or outro text, explanations, or warnings. Generate ONLY the code block.\n"
+        "7. NEVER compare Manim direction vectors (like UP, DOWN, LEFT, RIGHT) directly using Python comparison operators (e.g., `direction == DOWN` or `if direction == UP:`). "
+        "Since these are numpy arrays, this raises a ValueError ('The truth value of an array with more than one element is ambiguous'). "
+        "Instead, check elements or use `all(direction == DOWN)` or `np.array_equal(direction, DOWN)`.\n"
+        "8. NEVER write new text/explanation Mobjects directly on top of existing ones. When updating on-screen explanation/status texts, "
+        "use `Transform` or explicitly `FadeOut` the old text before writing/fading in the new one. Place explanation/status text "
+        "at the bottom edge of the screen using `.to_edge(DOWN, buff=0.5)` to avoid overlapping with array cells or pointers.\n"
+        "9. Keep horizontal element layouts within the screen boundaries. A standard Manim screen has a width of 14.2 units and height of 8.0 units. "
+        "When arranging sequences of objects horizontally (like arrays or lists), scale the elements and keep the spacing buffer small "
+        "(e.g., `buff=0.1` to `0.2` rather than large values like `0.8`) to prevent objects from being cut off at the left and right edges."
+    )
+
+    # Exponential backoff parameters (up to 5 retries: 1s, 2s, 4s, 8s, 16s)
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=user_instruction,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.1,  # Keep it highly deterministic
+                )
+            )
+            return response.text
+        except Exception as e:
+            if attempt == max_retries - 1:
+                print(f"\n[Error] API call failed after {max_retries} attempts: {e}")
+                return ""
+            time.sleep(2 ** attempt)  # Delays of 1s, 2s, 4s, 8s...
+
+def extract_python_code(raw_response: str) -> str:
+    """
+    Parses out code block delimiters like ```python and ``` to return
+    only clean Python code.
+    """
+    pattern = r"```python\s*(.*?)\s*```"  
+    match = re.search(pattern, raw_response, re.DOTALL)  
+    if match:  
+        return match.group(1).strip()  
+    return raw_response.strip()  
+
+def save_code_to_file(code_content: str, filepath: str = "generated_scene.py") -> None:  
+    """  
+    Overwrites or creates a new file to store the parsed Python script.  
+    """  
+    try:  
+        with open(filepath, "w", encoding="utf-8") as f:  
+            f.write(code_content)  
+        print(f"\n[Success] Executable Manim animation code successfully saved to: '{filepath}'")  
+    except IOError as e:  
+        print(f"\n[File Error] Could not write Python code to file: {e}")  
+
+if __name__ == "__main__":  
+    print("==========================================================")  
+    print(" AI EDUCATIONAL ANIMATION PLATFORM (WEEK 1 LLM BRIDGE) ")  
+    print("==========================================================")  
+
+    # Get interactive prompt input directly in your VS Code terminal  
+    user_prompt = input("\nEnter your animation concept (e.g. 'Show a blue circle expanding '): ")
+    
+    if not user_prompt.strip():
+        user_prompt = "Create a blue circle in the center that morphs into a yellow square."
+        print(f"Using default prompt: '{user_prompt}'")
+
+    print("\nContacting Gemini to generate animation logic...")
+    raw_response = generate_manim_code(user_prompt)
+
+    if raw_response:
+        print("\n--- Raw Response Received ---")
+        print(raw_response)
+        print("-----------------------------")
+
+        # Clean and save the response
+        clean_code = extract_python_code(raw_response)
+        save_code_to_file(clean_code, "generated_scene.py")
+    else:
+        print("\n[Pipeline Failed] No output was received. Please check your .env API key and connection.")
+\end{lstlisting}
+
+\subsection{src/pipeline.py}
+\begin{lstlisting}[language=Python]
+import os
+import re
+import subprocess
+import sys
+from llm_client import generate_manim_code, extract_python_code, save_code_to_file
+
+def find_manim_class_name(code: str) -> str:
+    """
+    Scans the generated Python code using Regex to find the name of the 
+    Manim Scene class so we know which class to render.
+    """
+    # Look for patterns like "class MyScene(Scene):" or "class MyScene( ZoomedScene ):"
+    pattern = r"class\s+(\w+)\s*\(\s*\w*Scene\w*\s*\)\s*:"
+    match = re.search(pattern, code)
+    if match:
+        return match.group(1)
+    
+    # Fallback to general class finder if "Scene" isn't explicitly in parentheses
+    pattern_fallback = r"class\s+(\w+)\s*\("
+    match_fallback = re.search(pattern_fallback, code)
+    if match_fallback:
+        return match_fallback.group(1)
+        
+    return "ExpandingBlueCircle"  % Default fallback
+
+def run_manim_rendering(filepath: str, class_name: str) -> bool:
+    """
+    Executes the Manim compiler command as a Python subprocess.
+    Equivalent to running: manim -pql filepath class_name in the terminal.
+    """
+    print(f"\n[Rendering] Compiling class '{class_name}' from '{filepath}'...")
+    
+    # -p: preview video when finished
+    # -ql: low quality (renders lightning fast at 480p)
+    command = [
+        "manim", 
+        "-pql", 
+        filepath, 
+        class_name
+    ]
+    
+    try:
+        # Run the command and stream output directly to VS Code terminal
+        result = subprocess.run(command, check=True)
+        if result.returncode == 0:
+            print("\n[Rendering Success] Animation generated and opened successfully!")
+            return True
+    except subprocess.CalledProcessError as e:
+        print(f"\n[Rendering Error] Manim compilation failed: {e}")
+    except FileNotFoundError:
+        print(f"\n[System Error] 'manim' command not found. Ensure Manim is installed in your virtual environment.")
+    
+    return False
+
+def start_pipeline():
+    print("==========================================================")
+    print("      AI ANIMATION PLATFORM - FULL AUTOMATION PIPELINE    ")
+    print("==========================================================")
+    
+    # 1. Ask user what they want to animate
+    user_prompt = input("\nWhat educational animation would you like to build? ")
+    if not user_prompt.strip():
+        print("Empty input. Running default physics demo...")
+        user_prompt = "Animate a projectile motion trajectory with a bouncing ball."
+        
+    # 2. Get code from Gemini
+    raw_response = generate_manim_code(user_prompt)
+    if not raw_response:
+        print("[Error] Failed to get response from Gemini.")
+        return
+
+    # 3. Clean and parse code
+    clean_code = extract_python_code(raw_response)
+    
+    # 4. Save the generated code to a file
+    scene_file = "generated_scene.py"
+    save_code_to_file(clean_code, scene_file)
+    
+    # 5. Dynamically extract the name of the Scene class generated by Gemini
+    class_name = find_manim_class_name(clean_code)
+    print(f"[Parser] Detected generated Scene class name: '{class_name}'")
+    
+    # 6. Render it automatically!
+    run_manim_rendering(scene_file, class_name)
+
+if __name__ == "__main__":
+    start_pipeline()
+\end{lstlisting}
+
+\end{document}
